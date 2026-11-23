@@ -1,0 +1,40 @@
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Go build output
+/netbench
+/bin/
+/dist/
+*.exe
+*.test
+*.out
+coverage.*
+go.work
+go.work.sum
+
+# Packaging (.deb builds)
+*.deb
+
+# containerlab runtime state
+clab-*/
+.*.clab.yml.bak
+
+# Benchmark output (results.jsonl, CSV, plots)
+/results/
+*.jsonl
+*.pcap
+*.pcapng
+
+# Plotting scripts (Python)
+__pycache__/
+.venv/
+.ipynb_checkpoints/
+
+# Secrets / local config
+.env
+*.pem
+id_rsa*
