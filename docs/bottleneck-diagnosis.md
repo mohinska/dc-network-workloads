@@ -1,7 +1,8 @@
 # Bottleneck diagnosis rules
 
 Which component limits performance, judged by host-side counters collected during the test
-(on sender, receiver and hypervisor). Starting point; thresholds to be tuned on measurements.
+(on sender, receiver and hypervisor). These are the rules the utility's analysis module applies.
+Starting point; thresholds to be tuned on measurements.
 
 | Observation | Bottleneck |
 |---|---|
