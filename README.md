@@ -80,6 +80,19 @@ isolation, bandwidth sharing under congestion/oversubscription, and recovery aft
 - Nazar Mykhailyshchuk: storage and TCP scenarios (fio, iperf3), scenario runner and metric collection modules, failure scenarios.
 - Together: test matrix, mixed workloads, result analysis, recommendations.
 
+## Project structure
+
+```
+cmd/netbench/       # entry point: netbench run / netbench agent
+internal/runner/    # scenario runner (iperf3, OSU, GPCNeT, fio), stepping threads and nodes
+internal/collect/   # metric collection: mpstat, sar, ss, nstat, interface counters, probes
+internal/analyze/   # baseline comparison, verdict, report (docs/bottleneck-diagnosis.md rules)
+scenarios/          # YAML scenarios from the test matrix
+testbed/            # local testbed (docker), packaging
+docs/               # proposal, diagnosis rules
+results/            # measurement output (gitignored)
+```
+
 ## Documentation
 
 - [docs/proposal.md](docs/proposal.md): project proposal (UA)
