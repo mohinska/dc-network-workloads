@@ -5,6 +5,19 @@
 *.swp
 *~
 
+# Go
+/bin/
+*.exe
+*.test
+*.out
+coverage.*
+go.work
+go.work.sum
+
+# containerlab (lab state dirs, backups)
+clab-*/
+*.clab.yml.bak
+
 # Measurement output
 /results/
 *.pcap
