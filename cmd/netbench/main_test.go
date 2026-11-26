@@ -15,7 +15,7 @@ func TestRun(t *testing.T) {
 		{nil, 2, "usage"},
 		{[]string{"--help"}, 0, "analyze"},
 		{[]string{"run"}, 2, "usage: netbench run"},
-		{[]string{"agent"}, 1, "not implemented"},
+		{[]string{"agent"}, 2, "usage: netbench agent"},
 		{[]string{"analyze"}, 1, "not implemented"},
 		{[]string{"bogus"}, 2, "unknown command"},
 	} {

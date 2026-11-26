@@ -15,5 +15,10 @@ Starting point; thresholds to be tuned on measurements.
 | Only one 5-tuple group or one leaf pair is bad | **One path / link** |
 | `ip -s link` errors, `ethtool -S` `*err*` counters ↑, TCP resets ↑ | **Link or driver errors** (Err) |
 
+> **Router CPU caveat (observed on the testbed):** forwarding runs in softirq, which is not charged to the
+> router container's cgroup. At ~1 Gbit through leaf1 the container showed `cpu_pct` ≤ 0.12 while the Docker
+> host showed `cpu_soft_pct_max` ≈ 25 %. So a "router CPU" check must use the host-wide `cpu_soft_pct(_max)`
+> in `_infra`, not the per-container `cgroup:<router>/cpu_pct`.
+>
 > In a virtual network the switches run on the same physical CPUs as the hosts, so a
 > "network" and a "CPU" bottleneck can be the same thing. Always record hypervisor load too.

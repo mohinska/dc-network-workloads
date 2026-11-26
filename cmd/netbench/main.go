@@ -11,9 +11,11 @@ import (
 	"os/signal"
 	"path/filepath"
 	"sort"
+	"syscall"
 	"text/tabwriter"
 	"time"
 
+	"netbench/internal/collect"
 	"netbench/internal/runner"
 	"netbench/internal/scenario"
 )
@@ -37,7 +39,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 0
 	case "run":
 		return runCmd(args[1:], stdout, stderr)
-	case "agent", "analyze":
+	case "agent":
+		return agentCmd(args[1:], stderr)
+	case "analyze":
 		fmt.Fprintf(stderr, "netbench %s: not implemented yet\n", args[0])
 		return 1
 	}
@@ -48,7 +52,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 func main() { os.Exit(run(os.Args[1:], os.Stdout, os.Stderr)) }
 
 // runCmd loads a scenario, runs its steps on the testbed and prints what each host got.
-// ponytail: only the load steps for now; baseline, metric agents and analysis join in T4/T6.
+// ponytail: no preflight, no analysis yet (T6); the netbench binary must already be on the hosts (make testbed-push).
 func runCmd(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("run", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -79,7 +83,9 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	fmt.Fprintf(stdout, "%s: %d steps, results in %s\n", sc.Name, len(sc.Steps), dir)
-	if err := runner.RunSteps(ctx, runner.SSH{Key: *key}.Exec, sc, dir); err != nil {
+	warn := func(m string) { fmt.Fprintln(stderr, "netbench: warning:", m) }
+	infra := collect.NewInfra(ctx, "clab-netbench-", warn)
+	if err := runner.Run(ctx, runner.SSH{Key: *key}.Exec, sc, dir, infra); err != nil {
 		fmt.Fprintln(stderr, "netbench:", err)
 		return 1
 	}
@@ -105,5 +111,39 @@ func runCmd(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	tw.Flush()
+	return 0
+}
+
+// agentCmd samples this host once per interval and writes JSON lines until it gets SIGINT/SIGTERM.
+// It is started on the testbed hosts by `netbench run`.
+func agentCmd(args []string, stderr io.Writer) int {
+	fs := flag.NewFlagSet("agent", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	hostname, _ := os.Hostname()
+	host := fs.String("host", hostname, "host label written into every sample")
+	peer := fs.String("peer", "", "data IP to ping every interval (empty = no probe)")
+	outPath := fs.String("out", "", "output file (JSON lines)")
+	interval := fs.Duration("interval", time.Second, "sampling interval")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *outPath == "" {
+		fmt.Fprintln(stderr, "usage: netbench agent --out file [--host name] [--peer ip] [--interval 1s]")
+		return 2
+	}
+	f, err := os.Create(*outPath)
+	if err != nil {
+		fmt.Fprintln(stderr, "netbench:", err)
+		return 1
+	}
+	defer f.Close()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	a := &collect.Agent{Host: *host, Peer: *peer, FS: os.DirFS("/"),
+		Warn: func(m string) { fmt.Fprintln(stderr, "netbench agent: warning:", m) }}
+	if err := a.Run(ctx, f, *interval); err != nil {
+		fmt.Fprintln(stderr, "netbench:", err)
+		return 1
+	}
 	return 0
 }

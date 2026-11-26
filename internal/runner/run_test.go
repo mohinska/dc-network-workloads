@@ -8,8 +8,10 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/fstest"
 	"time"
 
+	"netbench/internal/collect"
 	"netbench/internal/scenario"
 )
 
@@ -47,18 +49,28 @@ func TestParseIperf3Errors(t *testing.T) {
 
 // fake records every command; the iperf3 client returns the fixture after `refuse` refused attempts.
 type fake struct {
-	mu      sync.Mutex
-	calls   []string // "target: cmd"
-	refuse  int
-	fixture []byte
-	errOut  []byte
+	mu          sync.Mutex
+	calls       []string // "target: cmd"
+	refuse      int
+	fixture     []byte
+	errOut      []byte
+	metrics     []byte // what a stopped agent hands back
+	failAgentOn string // ssh target whose agent start fails
 }
 
 func (f *fake) exec(_ context.Context, target, cmd string) ([]byte, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, target+": "+cmd)
-	if !strings.Contains(cmd, "iperf3 -c") {
+	switch {
+	case strings.Contains(cmd, "netbench agent --out"):
+		if target == f.failAgentOn {
+			return nil, errors.New("netbench is not installed on this host")
+		}
+		return []byte("4242\n"), nil
+	case strings.Contains(cmd, "kill -TERM 4242"):
+		return f.metrics, nil
+	case !strings.Contains(cmd, "iperf3 -c"):
 		return nil, nil
 	}
 	if f.refuse > 0 {
@@ -80,7 +92,7 @@ func (f *fake) count(sub string) (n int) {
 func newFake(t *testing.T) *fake {
 	fx, _ := os.ReadFile("testdata/iperf3_p8.json")
 	eo, _ := os.ReadFile("testdata/iperf3_error.json")
-	return &fake{fixture: fx, errOut: eo}
+	return &fake{fixture: fx, errOut: eo, metrics: []byte(`{"ts":"2026-11-26T18:00:00Z","host":"x","src":"probe","key":"rtt_ms","value":0.5}` + "\n")}
 }
 
 const twoFlows = `
@@ -172,5 +184,86 @@ func TestRunStepsWholeSeconds(t *testing.T) {
 	sc.Duration = 1500 * time.Millisecond
 	if err := RunSteps(context.Background(), newFake(t).exec, sc, t.TempDir()); err == nil {
 		t.Error("fractional seconds must be rejected")
+	}
+}
+
+func destIn(dir string) func(string) string {
+	return func(h string) string { return filepath.Join(dir, h+".jsonl") }
+}
+
+func TestCollectStoresMetrics(t *testing.T) {
+	sc, _ := scenario.Parse([]byte(twoFlows))
+	f, dir := newFake(t), t.TempDir()
+	infra := &collect.Agent{Host: "_infra", FS: fstest.MapFS{}, Only: []string{"cpu"}}
+	if err := Collect(context.Background(), f.exec, sc, infra, destIn(dir), func(context.Context) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	for _, h := range []string{"h1", "h2", "h4", "_infra"} {
+		if _, err := os.Stat(filepath.Join(dir, h+".jsonl")); err != nil {
+			t.Error(err)
+		}
+	}
+	got, _ := os.ReadFile(filepath.Join(dir, "h1.jsonl"))
+	if string(got) != string(f.metrics) {
+		t.Errorf("h1 metrics = %q", got)
+	}
+	// each host probes the other end of its flow; h4 receives from h1 and h2 and probes the first
+	for _, want := range []string{"ssh-h1: ", "--peer 10.0.4.2"} {
+		if f.count(want) == 0 {
+			t.Errorf("no call with %q in %q", want, f.calls)
+		}
+	}
+	if f.count("--host h4 --peer 10.0.1.2") != 1 || f.count("--host h2 --peer 10.0.4.2") != 1 {
+		t.Errorf("peers wrong: %q", f.calls)
+	}
+}
+
+func TestCollectStopsAgentsWhenLoadFails(t *testing.T) {
+	sc, _ := scenario.Parse([]byte(twoFlows))
+	f, dir := newFake(t), t.TempDir()
+	boom := errors.New("load failed")
+	err := Collect(context.Background(), f.exec, sc, nil, destIn(dir), func(context.Context) error { return boom })
+	if !errors.Is(err, boom) {
+		t.Fatalf("error = %v", err)
+	}
+	if f.count("kill -TERM 4242") != 3 {
+		t.Errorf("all 3 agents must be stopped: %q", f.calls)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "h1.jsonl")); err != nil {
+		t.Error("metrics of a failed step are still kept:", err)
+	}
+}
+
+func TestCollectAgentStartFailure(t *testing.T) {
+	sc, _ := scenario.Parse([]byte(twoFlows))
+	f := newFake(t)
+	f.failAgentOn = "ssh-h4"
+	called := false
+	err := Collect(context.Background(), f.exec, sc, nil, destIn(t.TempDir()), func(context.Context) error { called = true; return nil })
+	if err == nil || !strings.Contains(err.Error(), "start agent on h4") || !strings.Contains(err.Error(), "not installed") {
+		t.Errorf("error = %v", err)
+	}
+	if called {
+		t.Error("no load must run without all agents")
+	}
+}
+
+func TestRunWritesBaselineAndStepMetrics(t *testing.T) {
+	retryDelay = time.Millisecond
+	sc, _ := scenario.Parse([]byte(twoFlows))
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, scenario.ScenarioFile), []byte(twoFlows), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sc.BaselineDuration = 10 * time.Millisecond
+	if err := Run(context.Background(), newFake(t).exec, sc, dir, nil); err != nil {
+		t.Fatal(err)
+	}
+	r, err := scenario.LoadRun(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Baseline["h1"]) == 0 || len(r.Steps[1].Metrics["h4"]) == 0 || r.Steps[0].Tool["h2"].ThroughputBps == 0 {
+		t.Errorf("run incomplete: baseline %v, step2 metrics %v", r.Baseline, r.Steps[1].Metrics)
 	}
 }
