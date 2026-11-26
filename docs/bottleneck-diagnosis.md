@@ -4,6 +4,9 @@ Which component limits performance, judged by host-side counters collected durin
 (on sender, receiver and hypervisor). These are the rules the utility's analysis module applies.
 Starting point; thresholds to be tuned on measurements.
 
+**PoC scope:** the load tool, container CPU limit, network congestion and own-qdisc queue rules are
+implemented first. Host CPU / NIC, reordering, one path and link errors are in the backlog (`tasks/todo.md`: T8, T10).
+
 | Observation | Bottleneck |
 |---|---|
 | The load generator process itself uses 100 % of one core | **Load tool**, not host or network. Fix the tool setup first (e.g. iperf3 < 3.16 runs all streams in one thread) |
