@@ -1,0 +1,13 @@
+name: sample
+generator: iperf3
+hosts:
+  h1: {ssh: clab-netbench-h1, ip: 10.0.1.2}
+  h4: {ssh: clab-netbench-h4, ip: 10.0.4.2}
+flows:
+  - {from: h1, to: h4}
+steps:
+  - {streams: 1}
+  - {streams: 4}
+duration: 10s
+warmup: 3s
+baseline_duration: 3s
