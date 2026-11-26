@@ -43,6 +43,7 @@ func TestParseInvalid(t *testing.T) {
 		{"bad generator", "generator: iperf3", "generator: nope", "generator"},
 		{"no ssh", "ssh: clab-netbench-h1, ", "", "hosts.h1.ssh"},
 		{"bad ip", "ip: 10.0.1.2", "ip: 10.0.1", "hosts.h1.ip"},
+		{"same sender twice", "  - {from: h1, to: h4}", "  - {from: h1, to: h4}\n  - {from: h1, to: h4}", "already sends"},
 		{"unknown flow host", "to: h4", "to: h9", "flows[0].to"},
 		{"flow to itself", "to: h4", "to: h1", "same host"},
 		{"no steps", "steps:\n  - {streams: 1}\n", "steps: []\n", "steps: at least"},

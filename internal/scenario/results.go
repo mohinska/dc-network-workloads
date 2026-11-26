@@ -17,6 +17,7 @@ import (
 //	scenario.yaml                        copy of the scenario
 //	baseline/metrics/<host>.jsonl        samples with no load
 //	steps/<NN-streams-S>/tool/<host>.json     ToolResult per sending host
+//	steps/<NN-streams-S>/raw/<host>.json      the generator's own output, kept for debugging
 //	steps/<NN-streams-S>/metrics/<host>.jsonl samples; host "_infra" = Docker host and routers
 //	verdict.json, report.md, charts/     written by the analyze module
 const ScenarioFile = "scenario.yaml"
