@@ -1,47 +1,73 @@
 # Data Center Network Workloads
 
-`netbench` is a Linux utility. It runs data center workloads on a black-box network, collects host and
-network metrics in parallel, and reports whether the network is the bottleneck. If it is, the report names
-the network problem behind the drop: loss, latency, errors or link congestion.
+This project describes the **traffic profiles** of data center workloads, backend and frontend, and picks
+test tools from those profiles. The main deliverable is the description: [docs/traffic-profiles.md](docs/traffic-profiles.md).
+
+`netbench` is a proof-of-concept Linux utility on top of it. It runs a workload with a given profile on a
+black-box network, collects host and network metrics in parallel, and reports whether the network is the
+bottleneck. If it is, the report names the network problem behind the drop: loss, latency, errors or link
+congestion.
 
 ## Team
 
 | | Name | GitHub | Owns |
 |:-:|---|---|---|
-| <img src="https://github.com/mohinska.png?size=80" width="48" alt="mohinska"/> | Maryna Ohinska | [@mohinska](https://github.com/mohinska) | Workload table · MPI scenarios (MVAPICH, GPCNeT) · analysis and report module |
-| <img src="https://github.com/partum55.png?size=80" width="48" alt="partum55"/> | Nazar Mykhailyshchuk | [@partum55](https://github.com/partum55) | Storage and TCP scenarios (fio, iperf3) · scenario runner · metric collection · failure scenarios |
-| | Together | | Test matrix · mixed workloads · result analysis · recommendations |
+| <img src="https://github.com/mohinska.png?size=80" width="48" alt="mohinska"/> | Maryna Ohinska | [@mohinska](https://github.com/mohinska) | Traffic profile description (lead) · tool × profile matrix · test matrix · PoC analysis and report module · OSU/MPI scenarios · utility documentation |
+| <img src="https://github.com/partum55.png?size=80" width="48" alt="partum55"/> | Nazar Mykhailyshchuk | [@partum55](https://github.com/partum55) | Most of the PoC code, the part needed first: testbed · scenario runner (iperf3, netperf) · metric collection · diagnosis rules · stepped load and profile shape · frontend profile sections, checks the tool matrix by running the tools |
+| | Together | | Profile dimensions and definitions · data contract · mixed workloads · calibration and runs · recommendations |
 
 ## Problem
 
-**Context.** A data center runs four classes of workloads at the same time:
+**Context.** A data center runs several classes of workloads at the same time. Their traffic differs a lot:
 
-| Workload | Main traffic | Needs |
+| | Backend fabric (AI training, HPC) | Frontend fabric (clients, Internet, cloud-native, storage) |
 |---|---|---|
-| AI/HPC (model training) | East-West, server to server | Bandwidth and low latency |
-| Distributed storage (replication) | East-West | Bandwidth |
-| Virtual machines | Mixed | Mixed |
-| Cloud-native services (clients, BYOD, mobile) | North-South, from outside | Low latency |
+| Pairs | Few, fixed paths between predefined nodes | Very many addresses, chaotic |
+| Shape in time | Either silence or 100 % of the link | Fairly even load with spikes, changes with time of day |
+| Loss | A few lost packets are a catastrophe | Sensitive in most cases, with some exceptions |
 
-**Gap.** Load generators do not report network parameters. When a benchmark result drops, it is unclear
-whether CPU or the network is the cause. For example, more threads can lower performance because of the
-network, and the benchmark does not show it.
+Which tool to run and which metrics matter depends on the profile, not on the workload name.
 
-**Goal.** Tell **when** the network is the cause and **what** it is: loss, latency, errors or link congestion.
+**Gap.** There is no formal description of these profiles to choose tools from. Load generators also do not
+report network parameters: when a benchmark result drops, it is unclear whether CPU or the network is the
+cause.
 
 **Setting.** The network is a **black box**: an already configured virtual network with load run on top.
 
 ## Goals
 
-1. **Main:** a utility that runs workloads, collects host and network metrics at the same time, and tells
-   whether the network is the bottleneck and which network problem causes the drop.
-2. Workload table: traffic type (East-West / North-South; bandwidth-, latency-oriented or mixed) and
-   network requirements.
-3. Test matrix (scenarios for the utility): workload, tool, metrics, expected result.
-4. Use the utility to study how workloads affect each other when run together.
-5. Test on the topology and recommend test priorities.
+1. **Main:** describe the traffic profiles of backend and frontend in a cluster: definitions, dimensions,
+   what they depend on, workloads grouped by profile → [docs/traffic-profiles.md](docs/traffic-profiles.md).
+2. For each profile: tools that can generate it, and what each tool does and does not reproduce.
+3. Test matrix: profile, tool, metrics, expected result.
+4. **PoC utility** (`netbench`): runs a profile, collects host and network metrics, tells whether the network
+   is the bottleneck and which problem causes the drop.
+5. Test the PoC on the topology and recommend test priorities.
 
-## How the utility works
+## Traffic profiles
+
+**Backend** and **frontend** name the *fabric*; East-West / North-South is a separate dimension.
+
+| | Backend | Frontend |
+|---|---|---|
+| Connects | Compute nodes / GPUs with each other | Clients and Internet with services, services with each other, nodes with storage |
+| Traffic | One job's internal exchange: training collectives, MPI | North-South, plus East-West: microservice fan-out, data loading, checkpoints, management |
+
+Storage (including replication) rides the frontend or a separate storage network, not the backend.
+
+Profile dimensions: direction · src/dst pairs · shape in time · flow size · synchronization and pattern ·
+loss sensitivity · latency sensitivity · transport · ECMP entropy. Each dimension has categories and a
+measurable indicator. The table of profiles, the dimension → factor → mechanism mapping and the tool × profile
+matrix are in [docs/traffic-profiles.md](docs/traffic-profiles.md) (draft).
+
+## PoC scope
+
+The utility only needs to show the approach, so the PoC stays narrow: iperf3 and OSU, two profiles (AI-like
+backend: synchronous collectives, on-off; multi-stream frontend-like), the first diagnosis rules. What the
+testbed cannot reproduce (RDMA, lossless fabric, real switch buffers) is listed in the profiles document.
+The rest of the rules and scenarios are in the backlog in [tasks/todo.md](tasks/todo.md).
+
+## How the PoC utility works
 
 ![netbench run: seven stages](docs/img/pipeline.png)
 
@@ -85,36 +111,36 @@ could not be checked are listed as *not checked*, so missing data never looks li
 
 ## Scenarios
 
-| Scenario | Shows |
-|---|---|
-| Throughput | Bandwidth as threads and nodes grow |
-| Latency under load | Latency (mean, p99) while bandwidth traffic runs |
-| Incast | Many senders → one receiver (h2–h6 → h1) |
-| Spine load balancing | ECMP spread across both spines |
-| Link / node failure | Drop and recovery time |
-| Mixed workloads | AI/HPC + storage + background N-S: isolation, bandwidth sharing under oversubscription, recovery after failure |
-
-Detailed testing covers AI/HPC and distributed storage, the most network-demanding classes. Virtualization
-and cloud-native services serve as background traffic.
+| Scenario | Shows | PoC |
+|---|---|:-:|
+| Throughput | Bandwidth as threads and nodes grow | ✓ |
+| Latency under load | Latency (mean, p99) while bandwidth traffic runs | ✓ |
+| Incast | Many senders → one receiver (h2–h6 → h1) | backlog |
+| Spine load balancing | ECMP spread across both spines | backlog |
+| Link / node failure | Drop and recovery time | backlog |
+| Mixed workloads | One backend-like + one frontend-like profile together: isolation, bandwidth sharing under oversubscription | minimal |
 
 ## Tools and metrics
 
-| Tool | Purpose |
-|---|---|
-| MVAPICH + OSU Micro-Benchmarks | Latency, bandwidth, all-reduce / all-to-all as an AI/HPC model |
-| GPCNeT | Impact of congestion on other traffic |
-| iperf3 / netperf | Baseline throughput and latency, TCP/UDP, varying stream count |
-| fio over network storage | Storage traffic, incast |
+Tools are chosen from the profiles: which dimensions each tool reproduces is in the tool × profile matrix in
+[docs/traffic-profiles.md](docs/traffic-profiles.md#5-профіль--інструмент). The PoC uses:
+
+| Tool | Profile it models | PoC |
+|---|---|:-:|
+| MVAPICH + OSU Micro-Benchmarks | AI/HPC backend: fixed pairs, synchronous all-reduce / all-to-all, on-off | ✓ |
+| iperf3 / netperf | Frontend-like: many streams, baseline throughput and latency, TCP/UDP | ✓ |
+| GPCNeT | Impact of congestion on other traffic | backlog |
+| fio over network storage | Storage traffic, incast | backlog |
 | mpstat, sar, ss, nstat, interface counters, active probes | CPU and network state during a test (collected by the utility) |
 
 **Metrics:** throughput · latency (mean, p99) · Loss · Err · SeqErr · retransmits · CPU utilization.
 
 ## Deliverables
 
-- [ ] **Utility (main deliverable):** scenario runner, metric collection, automatic bottleneck detection (network vs CPU, specific network symptom), with docs
-- [ ] Workload table
-- [ ] Test matrix
-- [ ] Test results: utility reports for single and mixed workloads on the test topology
+- [ ] **Traffic profile description (main deliverable):** definitions, dimensions, dependencies, table of profiles, tool × profile matrix, sources
+- [ ] Test matrix (from the profiles)
+- [ ] **PoC utility:** scenario runner, metric collection, bottleneck detection (network vs CPU, specific network symptom), with docs
+- [ ] Test results: PoC reports for single and mixed profiles on the test topology
 - [ ] Prioritized test recommendations (documented facts separated from assumptions)
 
 ## Limitations
@@ -122,7 +148,8 @@ and cloud-native services serve as background traffic.
 | Limitation | Effect | How it is handled |
 |---|---|---|
 | Virtual network ≠ physical hardware (switch buffers, RDMA) | Absolute values differ from real hardware | Compare behavior, not absolute values |
-| No RDMA hardware in containers | MVAPICH runs over TCP (libfabric `tcp`), not its RDMA fast path | RDMA via Soft-RoCE is in the backlog |
+| No RDMA hardware in containers | MVAPICH runs over TCP (libfabric `tcp`), not its RDMA fast path; the AI backend profile is reproduced by traffic shape, not by transport | RDMA via Soft-RoCE is in the backlog |
+| Only 6 hosts | Many streams can be reproduced, many distinct addresses cannot | Stated in the profiles document |
 | Hosts and routers share the same physical CPU | A "network" and a "CPU" bottleneck can be the same thing | Router and Docker host CPU are recorded; such verdicts are flagged |
 | Network configuration is treated as unknown | The problem layer cannot be read directly | Inferred from in-leaf vs through-spine path comparison |
 
@@ -145,7 +172,7 @@ internal/collect/     # metric collection: mpstat, sar, ss, nstat, interface cou
 internal/analyze/     # baseline comparison, diagnosis rules, verdict, report
 scenarios/            # YAML scenarios from the test matrix
 testbed/              # containerlab topology, link profiles (tc), host images
-docs/                 # proposal, diagnosis rules, workload table, test matrix, results
+docs/                 # traffic profiles, proposal, diagnosis rules, test matrix, results
 docs/diagrams/        # diagram sources (HTML) → docs/img/ (PNG)
 tasks/                # implementation plan and task list
 results/              # measurement output (gitignored)
@@ -155,7 +182,8 @@ results/              # measurement output (gitignored)
 
 | Document | Contents |
 |---|---|
+| [docs/traffic-profiles.md](docs/traffic-profiles.md) | **Traffic profiles: backend vs frontend (main deliverable, draft, UA)** |
 | [docs/proposal.md](docs/proposal.md) | Project proposal (UA) |
-| [docs/bottleneck-diagnosis.md](docs/bottleneck-diagnosis.md) | Bottleneck diagnosis rules |
+| [docs/bottleneck-diagnosis.md](docs/bottleneck-diagnosis.md) | Bottleneck diagnosis rules (PoC) |
 | [tasks/plan.md](tasks/plan.md) | Implementation plan: architecture, phases, risks |
 | [tasks/todo.md](tasks/todo.md) | Task list with acceptance criteria |
