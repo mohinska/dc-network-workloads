@@ -1,7 +1,7 @@
-.PHONY: build test testbed-image testbed-up testbed-down
+.PHONY: build test testbed-image testbed-up testbed-down testbed-push
 
 build:
-	GOOS=linux go build -o bin/netbench ./cmd/netbench
+	CGO_ENABLED=0 GOOS=linux go build -o bin/netbench ./cmd/netbench
 
 test:
 	go vet ./... && go test ./...
@@ -16,3 +16,7 @@ testbed-up: testbed-image
 
 testbed-down:
 	containerlab destroy -t testbed/topology.clab.yml --cleanup
+
+# Copy the binary into the running hosts (netbench run starts `netbench agent` there).
+testbed-push: build
+	for n in 1 2 3 4 5 6; do docker cp bin/netbench clab-netbench-h$$n:/usr/local/bin/netbench; done

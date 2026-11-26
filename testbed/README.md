@@ -41,6 +41,9 @@ SSH from the controller (your machine):
 ssh -i testbed/.ssh/id_ed25519 -o StrictHostKeyChecking=no root@clab-netbench-h1
 ```
 
+The metric agent is the same `netbench` binary: after `make build`, `make testbed-push` copies it into the
+running hosts (`docker cp`). `netbench run` starts `netbench agent` on every host over SSH.
+
 macOS: run everything inside a Linux VM (OrbStack / Docker Desktop with a Linux VM); containerlab does not run natively.
 
 ## Link profiles

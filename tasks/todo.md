@@ -54,13 +54,14 @@
 - Залежності: T1, T2. Обсяг: M
 
 ### T4 [Н] Збір метрик: агент + baseline
-`netbench agent` на хості раз на секунду знімає `mpstat`, `nstat` (retrans, InErrs, SACK, DSACK),
-`ss -ti`, `/proc/net/softnet_stat`, `ip -s link`, ping-пробу до сусіда; пише JSONL.
+`netbench agent` на хості раз на секунду читає `/proc/stat`, `/proc/net/snmp` і `netstat` (retrans, InErrs, SACK, DSACK),
+`/proc/net/softnet_stat`, `/sys/class/net/*/statistics`, cgroup `cpu.stat` і шле ping-пробу до іншого кінця потоку; пише JSONL.
+`ss -ti` і `ethtool -S` — у беклозі.
 Runner запускає агентів до навантаження, знімає baseline, зупиняє після, забирає файли.
-- [ ] `baseline/` і `steps/<step>/metrics/<host>.jsonl` з'являються для кожного хоста
-- [ ] Контролер паралельно знімає CPU Docker-хоста і кожного leaf/spine-контейнера (`docker stats` / cgroup) → `metrics/_infra.jsonl`
-- [ ] Недоступне джерело (немає `ethtool`) пропускається з попередженням, а не падінням
-- [ ] Парсери кожного джерела мають тест на збереженому виводі
+- [x] `baseline/` і `steps/<step>/metrics/<host>.jsonl` з'являються для кожного хоста
+- [x] Контролер паралельно знімає CPU Docker-хоста і кожного leaf/spine-контейнера (`docker stats` / cgroup) → `metrics/_infra.jsonl`
+- [x] Недоступне джерело (немає `ethtool`) пропускається з попередженням, а не падінням
+- [x] Парсери кожного джерела мають тест на збереженому виводі
 - Перевірка: `go test ./internal/collect`; вручну — JSONL на testbed
 - Залежності: T1, T2. Обсяг: M
 
