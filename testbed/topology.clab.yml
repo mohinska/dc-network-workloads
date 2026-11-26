@@ -1,0 +1,94 @@
+# Fixed leaf-spine test topology (docs/img/topology.png).
+# eth0 of every node is the Docker mgmt network (controller SSH); the fabric is eth1+ (data).
+# Deploy: make testbed-up (needs the netbench-host image and root / clab_admins).
+name: netbench
+
+mgmt:
+  network: netbench-mgmt
+  ipv4-subnet: 172.20.20.0/24
+
+topology:
+  defaults:
+    kind: linux
+
+  nodes:
+    spine1:
+      image: quay.io/frrouting/frr:10.7.1
+      binds: [frr/daemons:/etc/frr/daemons, frr/spine1.conf:/etc/frr/frr.conf]
+      exec:
+        - sh -c 'for f in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > $f; done'
+    spine2:
+      image: quay.io/frrouting/frr:10.7.1
+      binds: [frr/daemons:/etc/frr/daemons, frr/spine2.conf:/etc/frr/frr.conf]
+      exec:
+        - sh -c 'for f in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > $f; done'
+    leaf1:
+      image: quay.io/frrouting/frr:10.7.1
+      binds: [frr/daemons:/etc/frr/daemons, frr/leaf1.conf:/etc/frr/frr.conf]
+      exec:
+        - sh -c 'for f in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > $f; done'
+        # ECMP hash: 1 = 5-tuple (spreads flows over both spines), 0 = src/dst IP only (low entropy)
+        - sysctl -w net.ipv4.fib_multipath_hash_policy=1
+    leaf2:
+      image: quay.io/frrouting/frr:10.7.1
+      binds: [frr/daemons:/etc/frr/daemons, frr/leaf2.conf:/etc/frr/frr.conf]
+      exec:
+        - sh -c 'for f in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > $f; done'
+        # ECMP hash: 1 = 5-tuple (spreads flows over both spines), 0 = src/dst IP only (low entropy)
+        - sysctl -w net.ipv4.fib_multipath_hash_policy=1
+    h1:
+      image: netbench-host
+      binds: [.ssh/id_ed25519.pub:/root/.ssh/authorized_keys:ro]
+      exec:
+        - ip link set eth1 up
+        - ip addr add 10.0.1.2/24 dev eth1
+        - ip route add 10.0.0.0/16 via 10.0.1.1
+    h2:
+      image: netbench-host
+      binds: [.ssh/id_ed25519.pub:/root/.ssh/authorized_keys:ro]
+      exec:
+        - ip link set eth1 up
+        - ip addr add 10.0.2.2/24 dev eth1
+        - ip route add 10.0.0.0/16 via 10.0.2.1
+    h3:
+      image: netbench-host
+      binds: [.ssh/id_ed25519.pub:/root/.ssh/authorized_keys:ro]
+      exec:
+        - ip link set eth1 up
+        - ip addr add 10.0.3.2/24 dev eth1
+        - ip route add 10.0.0.0/16 via 10.0.3.1
+    h4:
+      image: netbench-host
+      binds: [.ssh/id_ed25519.pub:/root/.ssh/authorized_keys:ro]
+      exec:
+        - ip link set eth1 up
+        - ip addr add 10.0.4.2/24 dev eth1
+        - ip route add 10.0.0.0/16 via 10.0.4.1
+    h5:
+      image: netbench-host
+      binds: [.ssh/id_ed25519.pub:/root/.ssh/authorized_keys:ro]
+      exec:
+        - ip link set eth1 up
+        - ip addr add 10.0.5.2/24 dev eth1
+        - ip route add 10.0.0.0/16 via 10.0.5.1
+    h6:
+      image: netbench-host
+      binds: [.ssh/id_ed25519.pub:/root/.ssh/authorized_keys:ro]
+      exec:
+        - ip link set eth1 up
+        - ip addr add 10.0.6.2/24 dev eth1
+        - ip route add 10.0.0.0/16 via 10.0.6.1
+
+  links:
+    # leaf <-> spine
+    - endpoints: ["leaf1:eth1", "spine1:eth1"]
+    - endpoints: ["leaf1:eth2", "spine2:eth1"]
+    - endpoints: ["leaf2:eth1", "spine1:eth2"]
+    - endpoints: ["leaf2:eth2", "spine2:eth2"]
+    # host <-> leaf
+    - endpoints: ["h1:eth1", "leaf1:eth3"]
+    - endpoints: ["h2:eth1", "leaf1:eth4"]
+    - endpoints: ["h3:eth1", "leaf1:eth5"]
+    - endpoints: ["h4:eth1", "leaf2:eth3"]
+    - endpoints: ["h5:eth1", "leaf2:eth4"]
+    - endpoints: ["h6:eth1", "leaf2:eth5"]
