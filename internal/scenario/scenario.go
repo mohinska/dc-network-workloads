@@ -103,7 +103,12 @@ func (s *Scenario) Validate() error {
 	if len(s.Flows) == 0 {
 		bad("flows: at least one required")
 	}
+	sender := map[string]int{} // results are stored per sending host, so a host can send only one flow
 	for i, f := range s.Flows {
+		if j, ok := sender[f.From]; ok {
+			bad("flows[%d].from: host %q already sends in flows[%d]", i, f.From, j)
+		}
+		sender[f.From] = i
 		for field, host := range map[string]string{"from": f.From, "to": f.To} {
 			if _, ok := s.Hosts[host]; !ok {
 				bad("flows[%d].%s: unknown host %q", i, field, host)
