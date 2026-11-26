@@ -1,0 +1,9 @@
+{"ts":"2026-11-26T18:00:00Z","host":"h1","src":"cpu","key":"cpu_busy_pct","value":2}
+{"ts":"2026-11-26T18:00:00Z","host":"h1","src":"snmp","key":"RetransSegs","value":0}
+{"ts":"2026-11-26T18:00:00Z","host":"h1","src":"probe","key":"rtt_ms","value":0.31}
+{"ts":"2026-11-26T18:00:01Z","host":"h1","src":"cpu","key":"cpu_busy_pct","value":3}
+{"ts":"2026-11-26T18:00:01Z","host":"h1","src":"snmp","key":"RetransSegs","value":0}
+{"ts":"2026-11-26T18:00:01Z","host":"h1","src":"probe","key":"rtt_ms","value":0.29}
+{"ts":"2026-11-26T18:00:02Z","host":"h1","src":"cpu","key":"cpu_busy_pct","value":2}
+{"ts":"2026-11-26T18:00:02Z","host":"h1","src":"snmp","key":"RetransSegs","value":0}
+{"ts":"2026-11-26T18:00:02Z","host":"h1","src":"probe","key":"rtt_ms","value":0.3}

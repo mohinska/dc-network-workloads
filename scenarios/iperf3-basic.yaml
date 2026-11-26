@@ -1,0 +1,19 @@
+# Single flow h1 -> h4 across the spine, stepping the number of TCP streams.
+name: iperf3-basic
+generator: iperf3
+
+hosts: # ssh = mgmt name (controller SSH), ip = data IP (load and probes)
+  h1: {ssh: clab-netbench-h1, ip: 10.0.1.2}
+  h4: {ssh: clab-netbench-h4, ip: 10.0.4.2}
+
+flows:
+  - {from: h1, to: h4}
+
+steps:
+  - {streams: 1}
+  - {streams: 4}
+  - {streams: 8}
+
+duration: 10s
+warmup: 3s # not counted in the result
+baseline_duration: 10s

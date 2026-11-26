@@ -1,0 +1,5 @@
+{
+  "throughput_bps": 940000000.0,
+  "lat_mean_ms": 0.41,
+  "retransmits": 0
+}
