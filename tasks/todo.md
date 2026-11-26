@@ -25,10 +25,10 @@
 `testbed/topology.clab.yml`:
 2 spine + 2 leaf (FRR, BGP, ECMP), 6 хостів (по 3 на leaf) з iperf3, sysstat, iproute2, SSH.
 Профілі лінків (`tc tbf` 1 Gbit, oversubscription) — окремі скрипти в `testbed/profiles/`.
-- [ ] `make build` дає Linux-бінарник, `bin/netbench --help` (у Linux) показує 3 підкоманди
-- [ ] `containerlab deploy` піднімає топологію; ping і SSH між усіма парами хостів працюють
-- [ ] ECMP: `ip route` на leaf показує 2 next-hop; при вимкненні одного spine-лінку трафік іде через інший
-- [ ] `testbed/README.md`: запуск на Linux (Н) і на macOS через Linux VM (М), як вносити `tc netem` / обмеження CPU / відмову лінку
+- [x] `make build` дає Linux-бінарник, `bin/netbench --help` (у Linux) показує 3 підкоманди
+- [x] `containerlab deploy` піднімає топологію; ping і SSH між усіма парами хостів працюють
+- [x] ECMP: `ip route` на leaf показує 2 next-hop; при вимкненні одного spine-лінку трафік іде через інший
+- [x] `testbed/README.md`: запуск на Linux (Н) і на macOS через Linux VM (М), як вносити `tc netem` / обмеження CPU / відмову лінку
 - Перевірка: вручну обома — ping h1→h4 через spine, `ssh h2 hostname` з h1
 - Залежності: T1. Обсяг: M
 
